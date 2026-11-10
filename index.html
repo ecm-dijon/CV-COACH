@@ -58,9 +58,6 @@ textarea,input[type=text],select{width:100%;font:inherit;color:var(--ink);backgr
   border:1px solid #9AA6B6;border-radius:0;padding:.6rem .7rem}
 textarea{min-height:9rem;margin-top:.6rem;resize:vertical}
 textarea:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--red);outline-offset:1px}
-.fields{display:grid;grid-template-columns:1fr;max-width:28rem;gap:1rem;margin:1.5rem 0 1rem}
-label.f{display:block;font-weight:600;font-size:.95rem}
-label.f input,label.f select{margin-top:.35rem;font-weight:400}
 .consent{display:flex;gap:.6rem;align-items:flex-start;font-size:.92rem;color:var(--muted);margin:1rem 0 1.4rem}
 .consent input{margin-top:.3rem;flex:none}
 button{font:600 1rem var(--font-body);background:var(--ink);color:#fff;border:0;padding:.85rem 1.5rem;cursor:pointer}
@@ -94,7 +91,6 @@ blockquote.after{background:var(--hl);border-left:3px solid #C9A400}
   .topbar img{height:64px}
   .hero{grid-template-columns:1fr;gap:2rem;padding-top:2rem}
   .sheet{max-width:260px;justify-self:start}
-  .fields{grid-template-columns:1fr}
   .panel{padding:1.25rem}
   .copy{padding:1.25rem 1.1rem 1.25rem 2.6rem}
   .copy::before{left:1.7rem}
@@ -144,11 +140,6 @@ blockquote.after{background:var(--hl);border-left:3px solid #C9A400}
         <textarea id="paste" aria-label="Texte de ton CV" placeholder="Colle ici le texte complet de ton CV"></textarea>
       </details>
 
-      <div class="fields">
-        <label class="f">Ta formation
-          <input type="text" id="formation" placeholder="ex. B3 Commerce, M1 Marketing" maxlength="120">
-        </label>
-      </div>
 
       <label class="consent">
         <input type="checkbox" id="consent">
@@ -287,7 +278,6 @@ form.addEventListener("submit", async e => {
 
   const ctx = [
     "Contexte de l’étudiant :",
-    "- Formation : " + ($("formation").value.trim() || "non précisée"),
     "- Recherche : alternance",
     "- Ouverture : l’étudiant reste ouvert à plusieurs types de postes et de secteurs"
   ].join("\n");
