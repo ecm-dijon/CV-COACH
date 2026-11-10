@@ -48,6 +48,18 @@ async function extract(pdfjs, bytes) {
   return buildDoc(pages);
 }
 
+/* L'école ajoute en haut des CV un encadré (logo, « ECM Ecole de Commerce et Management », www.ecm-france.fr,
+   coordonnées du CREE). Il est normal : on l'écarte de l'analyse et des annotations. */
+function dropEcmHeader(page) {
+  const anchors = page.runs.filter(r => r.y >= page.y0 + page.h * 0.6 &&
+    (/^(https?:\/\/)?(www\.)?ecm-france\.fr/i.test(r.str) || /^ecm\s+[ée]cole de commerce et/i.test(r.str)));
+  page.header = [];
+  if (!anchors.length) return;
+  const cut = Math.min(...anchors.map(a => a.y)) - 2.5 * Math.max(...anchors.map(a => a.h));
+  page.header = page.runs.filter(r => r.y >= cut);
+  page.runs = page.runs.filter(r => r.y < cut);
+}
+
 function splitColumns(page) {
   const W = page.w, runs = page.runs;
   if (runs.length < 12) return null;
@@ -109,6 +121,7 @@ function headingKey(text) {
 function buildDoc(pages) {
   const lines = [];
   for (const p of pages) {
+    dropEcmHeader(p);
     const sp = splitColumns(p);
     if (sp) lines.push(...toLines(sp.left, p, "L"), ...toLines(sp.right, p, "R"));
     else lines.push(...toLines(p.runs, p, "M"));
