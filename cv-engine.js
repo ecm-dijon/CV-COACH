@@ -175,6 +175,42 @@ const STOP = new Set(["de", "des", "du", "la", "le", "les", "et", "en", "d", "l"
 const tokens = s => norm(s).replace(/'/g, " ").split(" ").filter(t => t && !STOP.has(t));
 const TYPE_TOKENS = /\b(licence|bachelor|master|mastere|bts|titre|global)\b/;
 
+function matchOfficial(text) {
+  const n = norm(text);
+  if (!TYPE_TOKENS.test(n)) return null;
+  const A = new Set(tokens(text));
+  let best = { score: 0, title: "" };
+  for (const t of OFFICIAL) {
+    const B = tokens(t), score = B.filter(x => A.has(x)).length / B.length;
+    if (score > best.score) best = { score, title: t };
+  }
+  best.exact = best.score >= 0.5 && (n.includes(norm(best.title)) || norm(best.title).includes(n));
+  return best;
+}
+
+const MONTHS = { janvier: 1, janv: 1, fevrier: 2, fevr: 2, fev: 2, mars: 3, avril: 4, avr: 4, mai: 5, juin: 6, juillet: 7, juil: 7, aout: 8, septembre: 9, sept: 9, sep: 9, octobre: 10, oct: 10, novembre: 11, nov: 11, decembre: 12, dec: 12 };
+// « Février 2024 - Août 2025 », « 2023-2024 », « depuis sept. 2025 » -> { start, end } en mois depuis l'an 0
+function parseRange(text) {
+  const t = norm(text), re = /(?:(janvier|janv|fevrier|fevr|fev|mars|avril|avr|mai|juin|juillet|juil|aout|septembre|sept|sep|octobre|oct|novembre|nov|decembre|dec) )?((?:19|20)\d{2})/g;
+  const ys = []; let m;
+  while ((m = re.exec(t))) ys.push({ y: +m[2], m: m[1] ? MONTHS[m[1]] : 0 });
+  if (!ys.length) return null;
+  const lo = Math.min(...ys.map(k => k.y * 12 + (k.m || 1))), hi = Math.max(...ys.map(k => k.y * 12 + (k.m || 12)));
+  const now = NOW_YEAR * 12 + new Date().getMonth() + 1;
+  return { start: lo, end: /aujourd|present|actuel|en cours|ce jour|depuis/.test(t) ? Math.max(hi, now) : hi };
+}
+// -1 : du plus ancien au plus récent (à corriger) ; sinon nombre de paires à l'envers
+function orderProblems(ranges) {
+  let asc = 0, desc = 0;
+  for (let i = 1; i < ranges.length; i++) {
+    const a = ranges[i - 1], b = ranges[i];
+    if (!a || !b) continue;
+    if (b.end > a.end + 1 || (b.end === a.end && b.start > a.start + 1)) asc++;
+    else if (b.end < a.end - 1 || (b.end === a.end && b.start < a.start - 1)) desc++;
+  }
+  return { asc, desc };
+}
+
 const SPELL = {
   aout: "août", fevrier: "février", decembre: "décembre", developement: "développement", dévelopement: "développement",
   competence: "compétence", competences: "compétences", experience: "expérience", experiences: "expériences",
@@ -197,6 +233,7 @@ const SPELL = {
 function analyze(doc) {
   const F = [], POS = [], L = doc.lines, S = doc.sections;
   const fullText = L.map(l => l.text).join("\n");
+  const mentionsEcm = /\becm\b|ecole de commerce et (de )?management/.test(norm(fullText));
   const english = (fullText.match(/\b(experience|education|skills|languages|summary|projects|volunteer|references|internship)\b/gi) || []).length >= 3;
 
   const hits = (re, lines = L) => {
@@ -273,11 +310,24 @@ function analyze(doc) {
     const txt = grp.map(g => g.text).join(" ");
     const gaps = [];
     if (!/alternance|apprentissage|professionnalisation|stage/i.test(txt)) gaps.push("le type de contrat");
-    if (!/\b\d{1,2}\s*(mois|ans?|semaines?)\b|\bun an\b|\bdeux ans\b/i.test(txt)) gaps.push("la durée");
-    if (!/(janvier|f[ée]vrier|mars|avril|mai|juin|juillet|ao[uû]t|septembre|octobre|novembre|d[ée]cembre|rentr[ée]e)/i.test(txt)) gaps.push("la date de début");
-    if (!/(licence|bachelor|mast[èe]re?|master|bts|parcours global|dipl[ôo]me|titre|formation)/i.test(txt)) gaps.push("la formation préparée");
-    if (gaps.length) add("error", "recherche", "Ligne de recherche incomplète", "Il manque " + gaps.join(", ") + ". Modèle : « À la recherche d’une alternance de 24 mois, à partir de septembre 2026, dans le cadre de ma licence … ».", [whole(grp[0])]);
-    else ok("Ligne de recherche complète (contrat, durée, début, formation)");
+    if (!/\b\d{1,2}\s*(mois|ans?|semaines?)\b|\bun an\b|\bdeux ans\b/i.test(txt)) gaps.push("la durée (12 ou 24 mois)");
+    const hasMonth = /(janvier|f[ée]vrier|mars|avril|mai|juin|juillet|ao[uû]t|septembre|octobre|novembre|d[ée]cembre|rentr[ée]e)/i.test(txt);
+    if (!hasMonth) gaps.push("le mois de début"); else if (!/(?:19|20)\d{2}/.test(txt)) gaps.push("l’année de début");
+    if (!/dans le cadre/i.test(txt)) gaps.push("« dans le cadre de… » suivi du nom exact de ton diplôme");
+    const FORMULE = "Modèle : « À la recherche d’une alternance de 24 mois à partir de septembre 2026, dans le cadre de [nom exact de ton diplôme] ».";
+    if (gaps.length) add("error", "recherche", "Ligne de recherche incomplète", "Il manque " + gaps.join(", ") + ". " + FORMULE, [whole(grp[0])]);
+    else {
+      const cadre = grp.map(g => ({ g, k: g.text.search(/dans le cadre/i) })).find(x => x.k >= 0);
+      const after = txt.slice(txt.search(/dans le cadre/i)).replace(/^dans le cadre\s+(?:de |du |des |d['’]\s*)?(?:ma |mon |mes |la |le |l['’]\s*)?/i, "").trim();
+      const target = { line: cadre.g, from: cadre.k, to: cadre.g.text.length };
+      if (tokens(after).length < 3) add("error", "diplome-accroche", "Nom du diplôme incomplet", "Après « dans le cadre de », écris l’intitulé exact de ton diplôme, pas seulement « ma licence » ou « mon master ». " + FORMULE, [target]);
+      else {
+        const mo = matchOfficial(after);
+        if (mo && mo.score >= 0.5 && !mo.exact) add("error", "diplome-accroche", "Intitulé du diplôme", "Utilise l’intitulé officiel de ton diplôme : « " + mo.title + " ». Il doit figurer mot pour mot dès la première ligne de ton CV.", [target]);
+        else if ((!mo || mo.score < 0.5) && mentionsEcm) add("advice", "diplome-accroche", "Diplôme non reconnu", "Je ne retrouve pas ce diplôme dans la liste officielle de l’ECM Dijon. Vérifie son intitulé exact auprès de ton CREE.", [target]);
+        else ok("Ligne de recherche complète, avec le nom du diplôme");
+      }
+    }
     const next = pre[iSearch + grp.length];
     if (next) {
       const up = next.text.replace(/[^A-Za-zÀ-ÿ]/g, "");
@@ -303,7 +353,6 @@ function analyze(doc) {
   const ecmName = hits(/[ée]cole de commerce et de management/i);
   if (ecmName.length) add("error", "ecm", "Nom de l’école", "Le nom officiel s’écrit « École de Commerce et Management », sans « de » avant Management.", ecmName);
   let officialOk = false, officialSeen = false;
-  const mentionsEcm = /\becm\b|ecole de commerce et (de )?management/.test(norm(fullText));
   const bad = [];
   for (const ln of forms) {
     const n = norm(ln.text);
@@ -334,6 +383,11 @@ function analyze(doc) {
     const odd = ranges.filter(h => !inverted.includes(h) && +h.m[1] < birthYear + 13);
     if (odd.length) add("error", "dates-age", "Dates incohérentes avec ton âge", "Avec " + age + " ans, ces années ne collent pas : vérifie tes dates d’études ou ton âge.", odd);
   }
+  const fdates = forms.filter(l => /(?:19|20)\d{2}/.test(l.text) && !/^\s*(sp[ée]cialit|option|mention)/i.test(l.text));
+  if (fdates.length >= 2) {
+    const { asc } = orderProblems(fdates.map(l => parseRange(l.text)));
+    if (asc) add("error", "chrono-formations", "Formations à l’envers", "Classe aussi tes formations de la plus récente à la plus ancienne : ton diplôme actuel d’abord, le bac ensuite.", [whole(S.formations.head), ...fdates.map(whole)]);
+  }
   const empty = hits(/^\s*(sp[ée]cialit[ée]s?|options?|mentions?|sp[ée]cialisations?)\s*:?\s*$/i);
   if (empty.length) add("error", "vide", "Rubrique vide", "Complète cette ligne (tes spécialités ou options) ou supprime-la : une ligne vide fait négligé.", empty);
 
@@ -347,14 +401,23 @@ function analyze(doc) {
   }));
   const allBullets = entries.flatMap(e => e.bullets);
   const INF_NOT = new Set(["dossier", "atelier", "premier", "dernier", "cahier", "courrier", "papier", "panier", "quartier", "employer"]);
-  const INF_IRRE = /^(mettre|prendre|suivre|vendre|conduire|construire|produire|réduire|fournir|établir|définir|choisir|réussir|obtenir|maintenir|offrir|ouvrir|accueillir|atteindre|apprendre|comprendre|permettre|recevoir|faire|écrire)$/i;
+  const INF_IRRE = /^(mettre|prendre|suivre|vendre|conduire|construire|produire|réduire|fournir|établir|définir|choisir|réussir|obtenir|maintenir|offrir|ouvrir|accueillir|atteindre|apprendre|comprendre|permettre|recevoir|faire|écrire|tenir|retenir|soutenir|venir|devenir|servir|partir|sortir|remplir|saisir|finir|agir|rendre|répondre|attendre|entendre|vivre|lire|dire|instruire|prévoir|voir|savoir|pouvoir|vouloir|devoir|percevoir|concevoir|entreprendre|promettre|transmettre|soumettre|admettre|perdre|défendre|descendre|connaître|reconnaître|paraître|mener|promouvoir|couvrir|découvrir|cuire|joindre|rejoindre|suffire|boire|croire|plaire|rire|taire|battre|convaincre|coudre|craindre|peindre|résoudre|revendre)$/i;
   const firstWord = b => (b.text.replace(/^[•\-–·●▪◦\s]+/, "").match(new RegExp("^[" + LET + "’']+")) || [""])[0];
   const cat = b => { const w = firstWord(b).toLowerCase(); if (!w) return null; return (w.length >= 4 && /er$/.test(w) && !INF_NOT.has(w)) || INF_IRRE.test(w) ? "inf" : "nom"; };
   entries.forEach(e => {
-    if (e.bullets.length && e.bullets.length < 3) add("advice", "missions", "Missions trop courtes", "Détaille cette expérience : 4 à 6 missions concrètes montrent ce que tu sais faire.", [e.title && whole(e.title)]);
-    else if (e.bullets.length > 8) add("advice", "missions-long", "Trop de missions", "Garde les 6 ou 7 missions les plus parlantes pour le poste visé.", [e.title && whole(e.title)]);
-    if (e.bullets.length >= 3 && !e.bullets.some(b => /\d/.test(b.text))) add("advice", "chiffres", "Aucun chiffre", "Ajoute au moins un chiffre ou un volume (nombre de clients, d’événements, d’appels, de campus…) : c’est ce qui rend une mission crédible.", [e.title && whole(e.title)]);
+    const n = e.bullets.length, tg = [whole(e.title)];
+    if (n === 0) add("error", "missions", "Aucune mission détaillée", "Cette expérience n’a aucune mission sous son intitulé. Décris 5 à 7 missions concrètes : verbe d’action, outil utilisé, résultat chiffré. C’est là que le recruteur juge ton expérience.", tg);
+    else if (n < 5) add("error", "missions", "Expérience trop peu détaillée", "Seulement " + n + " mission" + (n > 1 ? "s" : "") + " : ce n’est pas assez. Détaille 5 à 7 missions concrètes (verbe d’action, outil, résultat chiffré) : c’est ce qui prouve que tu sais faire.", tg);
+    else if (n > 8) add("advice", "missions-long", "Trop de missions", "Garde les 6 ou 7 missions les plus parlantes pour le poste visé.", tg);
+    if (n >= 3 && !e.bullets.some(b => /\d/.test(b.text))) add("advice", "chiffres", "Aucun chiffre", "Ajoute au moins un chiffre ou un volume (nombre de clients, d’événements, d’appels, de campus…) : c’est ce qui rend une mission crédible.", tg);
   });
+  const brief = allBullets.filter(b => b.text.replace(/^[•\-–·●▪◦\s]+/, "").split(/\s+/).length <= 3);
+  if (brief.length) add("advice", "missions-courtes", "Missions trop courtes", "Ces missions tiennent en trois mots : précise le contexte, l’outil ou le résultat (« Accueil des clients » devient « Accueillir 40 clients par jour et les orienter vers le bon rayon »).", brief.map(whole));
+  if (entries.length >= 2) {
+    const ranges = entries.map(e => parseRange(e.date.text)), { asc, desc } = orderProblems(ranges);
+    if (asc) add("error", "chrono", "Expériences à l’envers", asc && !desc ? "Tes expériences sont classées de la plus ancienne à la plus récente. En France, on fait l’inverse : la plus récente en premier, car c’est celle que le recruteur lit d’abord." : "Tes expériences ne sont pas toutes classées de la plus récente à la plus ancienne. En France, on commence toujours par la plus récente.", [whole(S.experiences.head), ...entries.map(e => whole(e.date))]);
+    else if (desc || ranges.every(Boolean)) ok("Expériences classées de la plus récente à la plus ancienne");
+  }
   const weak = hits(/^[•\-–·●▪◦\s]*(aider|participer|assister|contribuer|soutenir)(?![A-Za-zÀ-ÿ])/i, allBullets);
   if (weak.length) add("advice", "verbes-faibles", "Verbes trop faibles", "« Aider à », « participer à » minimisent ton rôle. Dis ce que tu as fait : créer, piloter, analyser, organiser…", weak);
   const kinds = allBullets.map(cat);
@@ -366,9 +429,7 @@ function analyze(doc) {
   }
   const trailing = hits(/[,;]\s*$/, allBullets);
   if (trailing.length) add("error", "virgule-fin", "Virgule en fin de mission", "On ne termine pas une puce par une virgule : retire-la (ou mets un point partout, mais sois cohérent).", trailing);
-  const starts = entries.map(e => { const m = e.date.text.match(/((?:19|20)\d{2})/); return m ? +m[1] : null; });
-  entries.forEach((e, i) => { if (i && starts[i] && starts[i - 1] && starts[i] > starts[i - 1]) add("advice", "chrono", "Ordre chronologique", "Place l’expérience la plus récente en premier : c’est elle que le recruteur lit d’abord.", [whole(e.date)]); });
-  if (entries.length && !weak.length && !trailing.length && entries.every(e => e.bullets.length >= 4)) ok("Expériences détaillées");
+  if (entries.length && !weak.length && !trailing.length && entries.every(e => e.bullets.length >= 5)) ok("Expériences détaillées (5 missions ou plus)");
 
   /* --- Logiciels, compétences, langues, centres d’intérêt --- */
   const gen = hits(/^(outils? bureautiques?|pack office|(?:microsoft )?office|suite office|informatique)\b/i, S.logiciels ? S.logiciels.lines : []);
