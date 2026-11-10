@@ -20,9 +20,9 @@
 html{scroll-padding-top:1rem}
 body{margin:0;background:var(--bg);color:var(--ink);font:400 1.0625rem/1.6 var(--font-body)}
 .wrap{max-width:1040px;margin:0 auto;padding:0 1.25rem}
-.topbar{background:var(--paper);border-bottom:1px solid var(--line)}
-.topbar .wrap{padding-top:.8rem;padding-bottom:.8rem}
-.topbar img{display:block;height:44px;width:auto;max-width:60vw}
+.topbar{background:var(--paper);border-bottom:3px solid #F04011}
+.topbar .wrap{padding-top:.6rem;padding-bottom:.6rem}
+.topbar img{display:block;height:80px;width:auto;max-width:60vw}
 
 /* Hero */
 .hero{display:grid;grid-template-columns:1.2fr .8fr;gap:3rem;align-items:center;padding:3.5rem 0 2.5rem}
@@ -91,6 +91,7 @@ blockquote.after{background:var(--hl);border-left:3px solid #C9A400}
 [hidden]{display:none!important}
 
 @media (max-width:760px){
+  .topbar img{height:64px}
   .hero{grid-template-columns:1fr;gap:2rem;padding-top:2rem}
   .sheet{max-width:260px;justify-self:start}
   .fields{grid-template-columns:1fr}
