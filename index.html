@@ -49,12 +49,8 @@ h1{font:700 clamp(2rem,5vw,3.25rem)/1.08 var(--font-head);letter-spacing:-.02em;
 .drop strong{display:block;font:700 1.1rem var(--font-head)}
 .drop span{color:var(--muted);font-size:.95rem}
 #fileName{display:block;margin-top:.4rem;color:var(--ink);font-weight:500}
-details{margin:1rem 0 0}
-summary{cursor:pointer;color:var(--muted);font-weight:500}
-summary:focus-visible{outline:3px solid var(--red);outline-offset:2px}
 textarea,input[type=text],select{width:100%;font:inherit;color:var(--ink);background:var(--paper);
   border:1px solid #9AA6B6;border-radius:0;padding:.6rem .7rem}
-textarea{min-height:9rem;margin-top:.6rem;resize:vertical}
 textarea:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--red);outline-offset:1px}
 .consent{display:flex;gap:.6rem;align-items:flex-start;font-size:.92rem;color:var(--muted);margin:1rem 0 1.4rem}
 .consent input{margin-top:.3rem;flex:none}
@@ -131,10 +127,6 @@ blockquote.after{background:var(--hl);border-left:3px solid #C9A400}
         <span>PDF uniquement, 4 Mo maximum (dans Word : Fichier, Exporter, PDF). Il est lu dans ton navigateur : seul son texte est envoyé pour analyse.</span>
         <span id="fileName">Aucun fichier choisi</span>
       </label>
-      <details>
-        <summary>Pas de PDF ? Colle le texte de ton CV</summary>
-        <textarea id="paste" aria-label="Texte de ton CV" placeholder="Colle ici le texte complet de ton CV"></textarea>
-      </details>
 
 
       <label class="consent">
@@ -184,7 +176,7 @@ function clearError(){ $("error").hidden = true; }
 
 const PDFJS_WORKER = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 async function extractPdfText(file){
-  const fail = () => new Error("Impossible de lire ce PDF. Colle le texte de ton CV à la place.");
+  const fail = () => new Error("Impossible de lire ce PDF. Exporte-le à nouveau depuis Word, Canva ou Google Docs (pas une photo ni un scan).");
   if(!window.pdfjsLib) throw fail();
   try{
     const blob = new Blob(['importScripts("' + PDFJS_WORKER + '");'], { type: "text/javascript" });
@@ -265,11 +257,10 @@ function reveal(){
 form.addEventListener("submit", async e => {
   e.preventDefault(); clearError();
   const file = fileInput.files[0];
-  const pasted = $("paste").value.trim();
 
-  if(!file && pasted.length < 200) return showError("Ajoute ton CV en PDF, ou colle son texte complet.");
-  if(file && file.type !== "application/pdf" && !/\.pdf$/i.test(file.name)) return showError("Le fichier doit être un PDF. Dans Word : Fichier, Exporter, PDF.");
-  if(file && file.size > MAX_PDF) return showError("Ce PDF dépasse 4 Mo. Exporte-le à nouveau sans images lourdes.");
+  if(!file) return showError("Ajoute ton CV au format PDF.");
+  if(file.type !== "application/pdf" && !/\.pdf$/i.test(file.name)) return showError("Le fichier doit être un PDF. Dans Word : Fichier, Exporter, PDF.");
+  if(file.size > MAX_PDF) return showError("Ce PDF dépasse 4 Mo. Exporte-le à nouveau sans images lourdes.");
   if(!$("consent").checked) return showError("Coche la case d’accord pour lancer l’analyse.");
 
   const ctx = [
@@ -282,11 +273,8 @@ form.addEventListener("submit", async e => {
   $("status").textContent = "Lecture de ton CV en cours, compte une trentaine de secondes…";
 
   try{
-    let cvText = pasted;
-    if(file){
-      cvText = await extractPdfText(file);
-      if(cvText.length < 200) throw new Error("Ce PDF ne contient pas de texte lisible (scan ou image). Exporte-le depuis Word ou colle son texte à la place.");
-    }
+    let cvText = await extractPdfText(file);
+    if(cvText.length < 200) throw new Error("Ce PDF ne contient pas de texte lisible (scan ou photo). Exporte-le à nouveau depuis Word, Canva ou Google Docs.");
     cvText = cvText.slice(0, 20000);
     messages = [{ role: "user", content: ctx + "\n\nTexte extrait du CV :\n\n" + cvText }];
     followups = 0;
