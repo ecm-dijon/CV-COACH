@@ -67,10 +67,12 @@ button.ghost:hover{background:#DDE3EA}
 .summary h2{font:700 1.4rem/1.2 var(--font-head);margin:0}
 .summary h2 .e{color:var(--red)} .summary h2 .a{color:var(--blue)}
 .summary .actions{display:flex;flex-wrap:wrap;gap:.6rem}
-.result{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:1.5rem;align-items:start}
-.preview{background:var(--paper);border:1px solid var(--line);padding:.75rem;position:sticky;top:1rem}
-.preview canvas{display:block;width:100%;height:auto}
-.preview p{margin:.5rem 0 0;font-size:.85rem;color:var(--muted)}
+.pages{margin:0 0 1.25rem}
+.pages canvas{display:block;width:100%;height:auto;background:#fff;border:1px solid var(--line);margin:0 0 1rem}
+.hint{color:var(--muted);font-size:.9rem;margin:-.25rem 0 1.25rem}
+details.textlist{margin:0 0 1rem}
+details.textlist summary{cursor:pointer;font-weight:600;padding:.6rem 0}
+details.textlist summary:focus-visible{outline:3px solid var(--red);outline-offset:2px}
 .copy{position:relative;background:var(--paper);border:1px solid var(--line);padding:1.5rem 1.5rem 1.5rem 3.2rem}
 .copy::before{content:"";position:absolute;left:2.2rem;top:0;bottom:0;border-left:2px solid var(--red);opacity:.45}
 .copy h3.sec{font:700 1.15rem/1.25 var(--font-head);margin:1.6rem 0 .6rem}
@@ -88,10 +90,6 @@ button.ghost:hover{background:#DDE3EA}
 .legal{color:var(--muted);font-size:.88rem;max-width:60rem;margin:2.5rem 0 3rem}
 [hidden]{display:none!important}
 
-@media (max-width:860px){
-  .result{grid-template-columns:1fr}
-  .preview{position:static}
-}
 @media (max-width:760px){
   .brand{height:84px}
   .hero{grid-template-columns:1fr;gap:2rem;padding-top:1.5rem}
@@ -109,7 +107,7 @@ button.ghost:hover{background:#DDE3EA}
   <div>
     <img class="brand" src="logo-ecm.png" alt="ECM, École de Commerce et Management" onerror="this.hidden=true">
     <h1>Fais corriger ton CV comme une copie d’examen</h1>
-    <p class="lede">Dépose ton CV en PDF : tu récupères ta copie corrigée, avec les erreurs soulignées en rouge, les conseils en bleu et un commentaire numéroté pour chacun. Tout se passe dans ton navigateur : ton CV n’est ni envoyé, ni enregistré.</p>
+    <p class="lede">Dépose ton CV en PDF : tu récupères ta copie corrigée sur une seule page, avec les erreurs soulignées en rouge, les conseils en bleu et les commentaires écrits dans la marge. Tout se passe dans ton navigateur : ton CV n’est ni envoyé, ni enregistré.</p>
   </div>
   <div class="sheet" aria-hidden="true">
     <div class="bar t" style="width:58%"></div>
@@ -152,13 +150,12 @@ button.ghost:hover{background:#DDE3EA}
         <button type="button" class="ghost" id="again">Corriger un autre CV</button>
       </div>
     </div>
-    <div class="result">
-      <div class="preview">
-        <canvas id="preview" aria-label="Aperçu de ton CV corrigé"></canvas>
-        <p>Aperçu de la première page. Le PDF téléchargé contient aussi les pages de commentaires.</p>
-      </div>
+    <div class="pages" id="pages" aria-label="Ton CV corrigé"></div>
+    <p class="hint">Zoome sur l’aperçu, ou télécharge le PDF pour lire les commentaires en grand.</p>
+    <details class="textlist">
+      <summary>Lire les commentaires en texte</summary>
       <div class="copy" id="thread"></div>
-    </div>
+    </details>
   </section>
 
   <p class="legal">Cette relecture est automatique : elle vérifie la forme de ton CV (rubriques du modèle de l’école, dates, intitulé de formation officiel, orthographe courante, typographie), mais ne juge ni la qualité de tes formulations ni la mise en page. Elle complète l’avis de ton CREE, elle ne le remplace pas. Elle ne garantit aucun résultat de recherche d’alternance.</p>
@@ -205,13 +202,15 @@ function renderNotes(res) {
 
 async function renderPreview(bytes) {
   const pdf = await pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
-  const page = await pdf.getPage(1);
-  const base = page.getViewport({ scale: 1 });
-  const cssW = Math.min(520, $("preview").parentElement.clientWidth - 24 || 520);
-  const scale = (cssW / base.width) * Math.min(window.devicePixelRatio || 1, 2);
-  const vp = page.getViewport({ scale });
-  const c = $("preview"); c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
-  await page.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise;
+  const box = $("pages"); box.innerHTML = "";
+  const cssW = box.clientWidth || 900, dpr = Math.min(window.devicePixelRatio || 1, 2);
+  for (let n = 1; n <= Math.min(pdf.numPages, 3); n++) {
+    const page = await pdf.getPage(n);
+    const base = page.getViewport({ scale: 1 }), vp = page.getViewport({ scale: (cssW / base.width) * dpr });
+    const c = document.createElement("canvas"); c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
+    box.appendChild(c);
+    await page.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise;
+  }
 }
 
 $("cvForm").addEventListener("submit", async e => {
@@ -242,7 +241,7 @@ $("cvForm").addEventListener("submit", async e => {
     $("t-out").innerHTML = 'Ta copie est corrigée : <span class="e">' + plural(res.errors, "correction") + '</span> et <span class="a">' + plural(res.advice, "conseil") + "</span>";
     renderNotes(res);
     $("output").hidden = false;
-    try { await renderPreview(out); } catch (err) { $("preview").parentElement.hidden = true; }
+    try { await renderPreview(out); } catch (err) { $("pages").hidden = true; }
     const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     $("output").scrollIntoView({ behavior: calm ? "auto" : "smooth", block: "start" });
     $("t-out").focus({ preventScroll: true });
@@ -254,8 +253,7 @@ $("cvForm").addEventListener("submit", async e => {
 });
 
 $("again").addEventListener("click", () => {
-  $("output").hidden = true; $("thread").innerHTML = "";
-  $("preview").parentElement.hidden = false;
+  $("output").hidden = true; $("thread").innerHTML = ""; $("pages").innerHTML = ""; $("pages").hidden = false;
   $("cvForm").reset(); $("fileName").textContent = "Aucun fichier choisi";
   window.scrollTo({ top: 0 });
 });

@@ -425,86 +425,113 @@ const clean = s => String(s).replace(/[\r\n\t\u00A0\u202F]+/g, " ").replace(/→
 
 async function annotate(PDFLib, bytes, doc, result, opts = {}) {
   const { PDFDocument, StandardFonts, rgb } = PDFLib;
-  const pdf = await PDFDocument.load(bytes, { ignoreEncryption: true });
-  const font = await pdf.embedFont(StandardFonts.Helvetica), bold = await pdf.embedFont(StandardFonts.HelveticaBold), ital = await pdf.embedFont(StandardFonts.HelveticaOblique);
-  const pages = pdf.getPages();
+  const src = await PDFDocument.load(bytes, { ignoreEncryption: true });
+  const out = await PDFDocument.create();
+  const font = await out.embedFont(StandardFonts.Helvetica), bold = await out.embedFont(StandardFonts.HelveticaBold);
+  const logo = opts.logoBytes ? await out.embedPng(opts.logoBytes) : null;
+  const srcPages = src.getPages();
+  const boxes = srcPages.map((sp, i) => { const p = doc.pages[i]; return p && !p.rotate ? { left: p.x0, bottom: p.y0, right: p.x0 + p.w, top: p.y0 + p.h } : undefined; });
+  const embedded = await out.embedPages(srcPages, boxes);
   const col = k => (k === "error" ? rgb(...RED) : rgb(...BLUE));
-  const placed = {};
-
-  for (const f of result.findings) {
-    for (const t of f.rects) {
-      const pg = pages[t.page];
-      if (!pg || doc.pages[t.page].rotate) continue;
-      const c = col(f.kind);
-      pg.drawLine({ start: { x: t.x, y: t.y - 1.8 }, end: { x: t.x + t.w, y: t.y - 1.8 }, thickness: 1.4, color: c, dashArray: f.kind === "error" ? undefined : [2.5, 1.5] });
-      const size = pg.getSize(), r = 6.3, list = (placed[t.page] = placed[t.page] || []);
-      const bx = Math.max(t.x + t.w, t.end), x0 = Math.min(bx + r + 3, size.width - r - 2);
-      let cx = x0, cy = t.y + t.h * 0.32;
-      for (let guard = 0; guard < 12 && list.some(p => Math.hypot(p.x - cx, p.y - cy) < 2 * r + 1); guard++) { cx += 2 * r + 1; if (cx > size.width - r - 2) { cx = x0; cy += 2 * r + 1; } }
-      list.push({ x: cx, y: cy });
-      pg.drawCircle({ x: cx, y: cy, size: r, color: c, borderColor: rgb(1, 1, 1), borderWidth: 0.8 });
-      const label = String(f.n), tw = bold.widthOfTextAtSize(label, 7.2);
-      pg.drawText(label, { x: cx - tw / 2, y: cy - 2.5, size: 7.2, font: bold, color: rgb(1, 1, 1) });
-    }
-  }
-  if (pages[0]) {
-    const stamp = clean("Relecture ECM : " + result.errors + " correction" + (result.errors > 1 ? "s" : "") + ", " + result.advice + " conseil" + (result.advice > 1 ? "s" : "") + " - voir les pages de commentaires");
-    const w = bold.widthOfTextAtSize(stamp, 6.5);
-    pages[0].drawRectangle({ x: 6, y: 2, width: w + 10, height: 11, color: rgb(1, 1, 1), opacity: 0.92 });
-    pages[0].drawText(stamp, { x: 11, y: 5, size: 6.5, font: bold, color: rgb(...RED) });
-  }
-
-  /* pages de commentaires */
-  const PW = 595.28, PH = 841.89, LM = 76, RM = 50, TW = PW - LM - RM;
-  const logo = opts.logoBytes ? await pdf.embedPng(opts.logoBytes) : null;
-  let page, y;
-  const newPage = first => {
-    page = pdf.addPage([PW, PH]);
-    page.drawLine({ start: { x: 58, y: 0 }, end: { x: 58, y: PH }, thickness: 1.1, color: rgb(0.84, 0.14, 0.16), opacity: 0.45 });
-    y = PH - 56;
-    if (first && logo) { const lw = 74, lh = (logo.height / logo.width) * lw; page.drawImage(logo, { x: PW - RM - lw, y: PH - 30 - lh, width: lw, height: lh }); }
-  };
   const wrap = (text, f, size, maxW) => {
-    const words = clean(text).split(/\s+/).filter(Boolean), out = []; let cur = "";
-    for (const w of words) { const t = cur ? cur + " " + w : w; if (f.widthOfTextAtSize(t, size) > maxW && cur) { out.push(cur); cur = w; } else cur = t; }
-    if (cur) out.push(cur); return out;
+    const words = clean(text).split(/\s+/).filter(Boolean), res = []; let cur = "";
+    for (const w of words) { const t = cur ? cur + " " + w : w; if (f.widthOfTextAtSize(t, size) > maxW && cur) { res.push(cur); cur = w; } else cur = t; }
+    if (cur) res.push(cur); return res;
   };
-  const need = h => { if (y - h < 56) newPage(false); };
-  const para = (text, f, size, color, indent = 0, gap = 3.5) => { for (const ln of wrap(text, f, size, TW - indent)) { need(size + gap); page.drawText(ln, { x: LM + indent, y, size, font: f, color }); y -= size + gap; } };
 
-  newPage(true);
-  page.drawText("Copie corrigée", { x: LM, y, size: 24, font: bold, color: rgb(...INK) }); y -= 22;
-  page.drawText(clean("Relecture de ton CV - " + new Date().toLocaleDateString("fr-FR")), { x: LM, y, size: 10, font, color: rgb(...GREY) }); y -= 22;
-  if (logo) y = Math.min(y, PH - 122);
-  para(result.errors + " correction" + (result.errors > 1 ? "s" : "") + " (soulignées en rouge) et " + result.advice + " conseil" + (result.advice > 1 ? "s" : "") + " (soulignés en bleu pointillé). Chaque numéro renvoie au même numéro sur ton CV.", font, 11, rgb(...INK), 0, 4);
-  y -= 8;
+  // chaque remarque est écrite sur la page de son premier soulignement ; les remarques générales sur la première page
+  const byPage = srcPages.map(() => []);
+  for (const f of result.findings) byPage[f.rects.length ? Math.min(f.rects[0].page, srcPages.length - 1) : 0].push(f);
 
-  for (const f of result.findings) {
-    const body = wrap(f.comment, font, 10.5, TW - 28), quote = f.quote ? wrap("Dans ton CV : « " + f.quote + " »", ital, 9, TW - 28) : [];
-    need(24 + body.length * 14 + quote.length * 12 + 10);
-    const c = col(f.kind);
-    page.drawCircle({ x: LM + 8, y: y - 3, size: 8.5, color: c });
-    const lab = String(f.n), lw = bold.widthOfTextAtSize(lab, 9);
-    page.drawText(lab, { x: LM + 8 - lw / 2, y: y - 6.2, size: 9, font: bold, color: rgb(1, 1, 1) });
-    page.drawText(clean(f.title), { x: LM + 26, y: y - 6, size: 11.5, font: bold, color: rgb(...INK) });
-    const tag = f.kind === "error" ? "À CORRIGER" : "CONSEIL", tgw = bold.widthOfTextAtSize(tag, 7.5);
-    page.drawText(tag, { x: PW - RM - tgw, y: y - 5.5, size: 7.5, font: bold, color: c });
-    y -= 22;
-    for (const ln of body) { page.drawText(ln, { x: LM + 26, y, size: 10.5, font, color: rgb(...INK) }); y -= 14; }
-    for (const ln of quote) { page.drawText(ln, { x: LM + 26, y, size: 9, font: ital, color: rgb(...GREY) }); y -= 12; }
-    y -= 10;
-  }
-  if (!result.findings.length) para("Aucun point à corriger n’a été détecté par la relecture automatique. Fais tout de même relire ton CV par ton CREE.", font, 11, rgb(...INK));
+  srcPages.forEach((sp, i) => {
+    const info = doc.pages[i] || { x0: 0, y0: 0, rotate: 0 };
+    const sz0 = sp.getSize(), W = info.rotate ? sz0.width : info.w, H = info.rotate ? sz0.height : info.h;
+    const s = Math.min(1.7, Math.max(0.85, W / 595));
+    const M = Math.round(Math.max(0.8 * W, 380 * s));
+    const items = byPage[i], footLimit = 40 * s, mx = W + 14 * s, mw = M - 26 * s;
 
-  if (result.positives.length) {
-    need(60); y -= 6;
-    page.drawText("Ce qui est conforme au modèle", { x: LM, y, size: 13, font: bold, color: rgb(...INK) }); y -= 20;
-    for (const p of result.positives) para("•  " + p, font, 10.5, rgb(...INK), 0, 4);
-    y -= 6;
-  }
-  need(90); y -= 10;
-  para("Cette relecture est automatique : elle vérifie la forme (rubriques du modèle, dates, intitulé de formation officiel, orthographe courante, typographie) mais ne juge ni la qualité de tes formulations ni la mise en page. Fais valider ton CV par ton CREE avant de l’envoyer. Ton CV n’a pas quitté ton ordinateur.", ital, 9, rgb(...GREY), 0, 3.5);
-  return pdf.save();
+    const make = (f, tier) => {
+      const sz = [8, 7.4, 6.9, 6.9][tier] * s, maxL = [3, 2, 1, 0][tier], tw = mw - 18 * s;
+      let lines = maxL ? wrap(f.comment, font, sz, tw) : [];
+      if (lines.length > maxL) { lines = lines.slice(0, maxL); lines[maxL - 1] = lines[maxL - 1].replace(/[\s,;:.]+$/, "") + "…"; }
+      return { f, sz, lines, h: 10.5 * s + lines.length * (sz + 2 * s) + 4 * s };
+    };
+    // placement : chaque remarque face à sa ligne (passe avant), sans rien faire déborder en bas (passe arrière)
+    const layout = (tier, extra) => {
+      const Hn = H + extra, topLimit = Hn - 58 * s;
+      let cursor = topLimit;
+      const its = items.map(f => {
+        const it = make(f, tier), pref = f.rects.length ? f.rects[0].y - info.y0 + extra + f.rects[0].h : null;
+        it.top = pref === null ? cursor : Math.min(pref + 4 * s, cursor);
+        cursor = it.top - it.h - 2 * s;
+        return it;
+      });
+      let limit = footLimit;
+      for (let k = its.length - 1; k >= 0; k--) { if (its[k].top - its[k].h < limit) its[k].top = limit + its[k].h; limit = its[k].top + 2 * s; }
+      const need = footLimit + its.reduce((n, it) => n + it.h + 2 * s, 0) - (H - 58 * s);
+      return { its, Hn, topLimit, bottom: its.length ? its[its.length - 1].top - its[its.length - 1].h : topLimit, need: Math.max(0, Math.ceil(need)) };
+    };
+    // la page s'allonge un peu si les remarques ne tiennent pas ; au-delà de 20 % on raccourcit les remarques
+    let tier = 0, lay = layout(0, 0);
+    for (; tier < 3; tier++) { lay = layout(tier, 0); if (lay.need <= 0.2 * H) break; }
+    lay = layout(tier, lay.need);
+    const extra = lay.Hn - H, Hn = lay.Hn, topLimit = lay.topLimit;
+
+    const page = out.addPage([W + M, Hn]);
+    page.drawPage(embedded[i], { x: 0, y: extra });
+
+    /* soulignements et pastilles sur le CV */
+    const placed = [];
+    for (const f of result.findings) for (const t of f.rects) {
+      if (t.page !== i || info.rotate) continue;
+      const c = col(f.kind), x = t.x - info.x0, y = t.y - info.y0 + extra, end = t.end - info.x0, r = 6.3 * s;
+      page.drawLine({ start: { x, y: y - 1.8 * s }, end: { x: x + t.w, y: y - 1.8 * s }, thickness: 1.4 * s, color: c, dashArray: f.kind === "error" ? undefined : [2.5 * s, 1.5 * s] });
+      const x0 = Math.min(Math.max(x + t.w, end) + r + 3 * s, W - r - 2);
+      let cx = x0, cy = y + t.h * 0.32;
+      for (let g = 0; g < 12 && placed.some(p => Math.hypot(p.x - cx, p.y - cy) < 2 * r + 1); g++) { cx += 2 * r + 1; if (cx > W - r - 2) { cx = x0; cy += 2 * r + 1; } }
+      placed.push({ x: cx, y: cy });
+      page.drawCircle({ x: cx, y: cy, size: r, color: c, borderColor: rgb(1, 1, 1), borderWidth: 0.8 });
+      const lab = String(f.n), tw = bold.widthOfTextAtSize(lab, 7.2 * s);
+      page.drawText(lab, { x: cx - tw / 2, y: cy - 2.5 * s, size: 7.2 * s, font: bold, color: rgb(1, 1, 1) });
+    }
+
+    /* marge de correction à droite, comme sur une copie d'examen */
+    page.drawLine({ start: { x: W + 3, y: 0 }, end: { x: W + 3, y: Hn }, thickness: 1.2, color: rgb(...RED), opacity: 0.55 });
+    page.drawText("Copie corrigée", { x: mx, y: Hn - 24 * s, size: 14 * s, font: bold, color: rgb(...INK) });
+    const head = clean(result.errors + " correction" + (result.errors > 1 ? "s" : "") + " (rouge), " + result.advice + " conseil" + (result.advice > 1 ? "s" : "") + " (bleu pointillé)");
+    page.drawText(head, { x: mx, y: Hn - 36 * s, size: 7.4 * s, font, color: rgb(...GREY) });
+    page.drawText(clean("Chaque numéro renvoie au même numéro sur le CV."), { x: mx, y: Hn - 45 * s, size: 7.4 * s, font, color: rgb(...GREY) });
+    if (logo) { const lw = 40 * s, lh = (logo.height / logo.width) * lw; page.drawImage(logo, { x: W + M - lw - 12 * s, y: Hn - 8 * s - lh, width: lw, height: lh }); }
+
+    for (const it of lay.its) {
+      const f = it.f, c = col(f.kind), top = it.top;
+      page.drawCircle({ x: mx + 5.4 * s, y: top - 5 * s, size: 5.4 * s, color: c });
+      const lab = String(f.n), lw = bold.widthOfTextAtSize(lab, 6.8 * s);
+      page.drawText(lab, { x: mx + 5.4 * s - lw / 2, y: top - 7.3 * s, size: 6.8 * s, font: bold, color: rgb(1, 1, 1) });
+      page.drawText(clean(f.title), { x: mx + 15 * s, y: top - 7.4 * s, size: 8 * s, font: bold, color: rgb(...INK) });
+      const tag = clean(f.kind === "error" ? "À CORRIGER" : "CONSEIL"), tg = bold.widthOfTextAtSize(tag, 5.6 * s);
+      page.drawText(tag, { x: W + M - 12 * s - tg, y: top - 7 * s, size: 5.6 * s, font: bold, color: c });
+      let ty = top - 10.5 * s - it.sz;
+      for (const ln of it.lines) { page.drawText(ln, { x: mx + 15 * s, y: ty + it.sz * 0.2, size: it.sz, font, color: rgb(...INK) }); ty -= it.sz + 2 * s; }
+    }
+    if (!items.length && i === 0) {
+      wrap("Aucun point à corriger n’a été détecté par la relecture automatique. Fais tout de même relire ton CV par ton CREE.", font, 8 * s, mw)
+        .forEach((ln, k) => page.drawText(ln, { x: mx, y: topLimit - k * 11 * s, size: 8 * s, font, color: rgb(...INK) }));
+    }
+    /* ce qui est conforme, si la place le permet */
+    if (i === 0 && result.positives.length) {
+      const sz = 7 * s, rows = result.positives.map(p => wrap("• " + p, font, sz, mw - 6 * s));
+      const need = 14 * s + rows.reduce((n, r) => n + r.length * (sz + 1.8 * s), 0);
+      if (lay.bottom - need > footLimit) {
+        let y = lay.bottom - 10 * s;
+        page.drawText("Conforme au modèle", { x: mx, y, size: 8 * s, font: bold, color: rgb(...INK) }); y -= 11 * s;
+        for (const r of rows) for (const ln of r) { page.drawText(ln, { x: mx + 4 * s, y, size: sz, font, color: rgb(...INK) }); y -= sz + 1.8 * s; }
+      }
+    }
+    const foot = wrap("Relecture automatique, sans IA : elle vérifie la forme (rubriques du modèle, dates, intitulé de formation, orthographe courante, typographie) mais pas la qualité des phrases ni la mise en page. Fais valider ton CV par ton CREE avant de l’envoyer. Ton CV n’a pas quitté ton ordinateur.", font, 5.8 * s, mw);
+    foot.forEach((ln, k) => page.drawText(ln, { x: mx, y: 26 * s - k * 7.4 * s, size: 5.8 * s, font, color: rgb(...GREY) }));
+  });
+  return out.save();
 }
 
 root.CVEngine = { extract, analyze, annotate, OFFICIAL };
