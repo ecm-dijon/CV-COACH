@@ -3,15 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Relecture de CV par un recruteur</title>
-<meta name="description" content="Dépose ton CV et reçois des commentaires de recruteur, des reformulations concrètes et un plan d’action. Sans compte.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<title>Fais corriger ton CV comme une copie d’examen</title>
+<meta name="description" content="Dépose ton CV en PDF et récupère ta copie corrigée : erreurs soulignées en rouge, conseils en bleu, commentaires numérotés. Tout se fait dans ton navigateur.">
 <style>
+@font-face{font-family:"Bricolage Grotesque";font-weight:500;font-display:swap;src:url(fonts/bricolage-grotesque-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"Bricolage Grotesque";font-weight:700;font-display:swap;src:url(fonts/bricolage-grotesque-latin-700-normal.woff2) format("woff2")}
+@font-face{font-family:"Instrument Sans";font-weight:400;font-display:swap;src:url(fonts/instrument-sans-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Instrument Sans";font-weight:500;font-display:swap;src:url(fonts/instrument-sans-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"Instrument Sans";font-weight:600;font-display:swap;src:url(fonts/instrument-sans-latin-600-normal.woff2) format("woff2")}
 :root{
   --bg:#E8EDF2; --paper:#FFFFFF; --ink:#16233B; --muted:#56637A; --line:#C9D2DD;
-  --red:#C8312B; --red-tint:#FBECEA; --hl:#FFF1B3;
+  --red:#C8312B; --red-tint:#FBECEA; --blue:#1F5FBF; --blue-tint:#EAF1FB; --hl:#FFF1B3;
   --font-head:"Bricolage Grotesque",system-ui,sans-serif;
   --font-body:"Instrument Sans",system-ui,sans-serif;
   color-scheme:light;
@@ -23,74 +25,82 @@ body{border-top:4px solid #F04011;margin:0;background:var(--bg);color:var(--ink)
 
 /* Hero */
 .hero{display:grid;grid-template-columns:1.2fr .8fr;gap:3rem;align-items:center;padding:3.5rem 0 2.5rem}
-h1{font:700 clamp(2rem,5vw,3.25rem)/1.08 var(--font-head);letter-spacing:-.02em;margin:0 0 1rem}
 .brand{display:block;height:104px;width:auto;margin:0 0 1.25rem -.4rem}
-.lede{color:var(--muted);max-width:34rem;margin:0}
+h1{font:700 clamp(2rem,5vw,3.25rem)/1.08 var(--font-head);letter-spacing:-.02em;margin:0 0 1rem}
+.lede{color:var(--muted);max-width:36rem;margin:0}
 .sheet{position:relative;width:100%;max-width:290px;justify-self:center;background:var(--paper);
   border:1px solid var(--line);padding:1.6rem 1.5rem 1.4rem;transform:rotate(1.5deg);
   box-shadow:0 18px 30px -22px rgba(22,35,59,.55)}
 .bar{height:.5rem;background:#DDE3EA;border-radius:2px;margin-bottom:.55rem}
 .bar.t{height:.95rem;background:var(--ink);margin-bottom:.4rem}
 .bar.h{height:.6rem;background:#9AA6B6;margin-top:1.1rem}
-.bar.hl{background:var(--hl)}
+.bar.ul{border-bottom:2px solid var(--red);height:.6rem;background:#DDE3EA;margin-bottom:.5rem}
 .note{position:absolute;right:.7rem;background:var(--paper);padding:.05rem .4rem;
   font:700 .92rem/1.25 var(--font-head);color:var(--red);transform:rotate(-2.5deg);
   text-decoration:underline wavy var(--red);text-underline-offset:4px;text-decoration-thickness:1px}
 .note.n1{top:6.3rem}
 .note.n2{top:11.4rem}
 
-/* Panels */
+/* Panneaux */
 .panel{background:var(--paper);border:1px solid var(--line);padding:2rem}
 .panel h2{font:700 1.5rem/1.2 var(--font-head);margin:0 0 1.25rem}
-.drop{position:relative;display:block;border:2px dashed #9AA6B6;padding:1.75rem 1rem;text-align:center;background:#F7F9FB}
+.drop{position:relative;display:block;border:2px dashed #9AA6B6;padding:1.75rem 1rem;text-align:center;background:#F7F9FB;margin-bottom:1.25rem}
 .drop:hover{border-color:var(--ink)}
 .drop:focus-within{outline:3px solid var(--red);outline-offset:2px}
 .drop input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
 .drop strong{display:block;font:700 1.1rem var(--font-head)}
 .drop span{color:var(--muted);font-size:.95rem}
 #fileName{display:block;margin-top:.4rem;color:var(--ink);font-weight:500}
-textarea,input[type=text],select{width:100%;font:inherit;color:var(--ink);background:var(--paper);
-  border:1px solid #9AA6B6;border-radius:0;padding:.6rem .7rem}
-textarea:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--red);outline-offset:1px}
-.consent{display:flex;gap:.6rem;align-items:flex-start;font-size:.92rem;color:var(--muted);margin:1rem 0 1.4rem}
-.consent input{margin-top:.3rem;flex:none}
-button{font:600 1rem var(--font-body);background:var(--ink);color:#fff;border:0;padding:.85rem 1.5rem;cursor:pointer}
-button:hover{background:#27406B}
-button:focus-visible{outline:3px solid var(--red);outline-offset:2px}
+button,.btn{font:600 1rem var(--font-body);background:var(--ink);color:#fff;border:0;padding:.85rem 1.5rem;cursor:pointer;text-decoration:none;display:inline-block}
+button:hover,.btn:hover{background:#27406B}
+button:focus-visible,.btn:focus-visible{outline:3px solid var(--red);outline-offset:2px}
 button:disabled{opacity:.55;cursor:wait}
 button.ghost{background:transparent;color:var(--ink);border:1px solid var(--ink)}
 button.ghost:hover{background:#DDE3EA}
 .error{background:var(--red-tint);border-left:4px solid var(--red);padding:.7rem 1rem;margin:1rem 0 0}
 #status{color:var(--muted);margin:1rem 0 0;min-height:1.6rem}
+.privacy{color:var(--muted);font-size:.92rem;margin:1.25rem 0 0}
 
-/* Résultat : feuille avec marge rouge */
+/* Résultat */
 #output{margin:2rem 0 0}
-.copy{position:relative;background:var(--paper);border:1px solid var(--line);padding:2rem 2rem 2rem 4rem}
-.copy::before{content:"";position:absolute;left:2.9rem;top:0;bottom:0;border-left:2px solid var(--red);opacity:.45}
-.copy h3{font:700 1.2rem/1.25 var(--font-head);margin:1.8rem 0 .5rem}
-.copy h3:first-child{margin-top:0}
-.copy p,.copy li{max-width:68ch}
-.copy ul,.copy ol{padding-left:1.25rem}
-blockquote{margin:.5rem 0;padding:.5rem .9rem;max-width:68ch}
-blockquote.before{background:var(--red-tint);border-left:3px solid var(--red)}
-blockquote.after{background:var(--hl);border-left:3px solid #C9A400}
-.ask{margin:2rem 0 0;padding:.7rem 1rem;background:#EEF2F6;font-style:italic;max-width:68ch}
-.followup{margin:1.5rem 0 0;display:flex;gap:.6rem;flex-wrap:wrap}
-.followup input{flex:1 1 18rem;width:auto}
-.again{margin:1.25rem 0 0}
+.summary{display:flex;flex-wrap:wrap;gap:1rem 1.5rem;align-items:center;justify-content:space-between;background:var(--paper);border:1px solid var(--line);padding:1.25rem 1.5rem;margin-bottom:1.25rem}
+.summary h2{font:700 1.4rem/1.2 var(--font-head);margin:0}
+.summary h2 .e{color:var(--red)} .summary h2 .a{color:var(--blue)}
+.summary .actions{display:flex;flex-wrap:wrap;gap:.6rem}
+.result{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:1.5rem;align-items:start}
+.preview{background:var(--paper);border:1px solid var(--line);padding:.75rem;position:sticky;top:1rem}
+.preview canvas{display:block;width:100%;height:auto}
+.preview p{margin:.5rem 0 0;font-size:.85rem;color:var(--muted)}
+.copy{position:relative;background:var(--paper);border:1px solid var(--line);padding:1.5rem 1.5rem 1.5rem 3.2rem}
+.copy::before{content:"";position:absolute;left:2.2rem;top:0;bottom:0;border-left:2px solid var(--red);opacity:.45}
+.copy h3.sec{font:700 1.15rem/1.25 var(--font-head);margin:1.6rem 0 .6rem}
+.copy h3.sec:first-child{margin-top:0}
+.notes{list-style:none;margin:0;padding:0}
+.notes li{display:grid;grid-template-columns:1.9rem 1fr;gap:.75rem;margin:0 0 1.15rem}
+.badge{display:inline-grid;place-items:center;width:1.7rem;height:1.7rem;border-radius:50%;color:#fff;font:700 .8rem var(--font-body);margin-top:.1rem}
+.error-n .badge{background:var(--red)} .advice-n .badge{background:var(--blue)}
+.notes h4{margin:0 0 .15rem;font:700 1rem/1.3 var(--font-head)}
+.notes h4 .tag{font:600 .68rem var(--font-body);letter-spacing:.06em;text-transform:uppercase;margin-left:.5rem}
+.error-n h4 .tag{color:var(--red)} .advice-n h4 .tag{color:var(--blue)}
+.notes p{margin:0;font-size:.97rem}
+.notes p.q{color:var(--muted);font-style:italic;font-size:.86rem;margin-top:.15rem}
+.ok-list{margin:0;padding-left:1.1rem}
 .legal{color:var(--muted);font-size:.88rem;max-width:60rem;margin:2.5rem 0 3rem}
 [hidden]{display:none!important}
 
+@media (max-width:860px){
+  .result{grid-template-columns:1fr}
+  .preview{position:static}
+}
 @media (max-width:760px){
   .brand{height:84px}
   .hero{grid-template-columns:1fr;gap:2rem;padding-top:1.5rem}
   .sheet{max-width:260px;justify-self:start}
   .panel{padding:1.25rem}
-  .copy{padding:1.25rem 1.1rem 1.25rem 2.6rem}
-  .copy::before{left:1.7rem}
+  .copy{padding:1.25rem 1rem 1.25rem 2.5rem}
+  .copy::before{left:1.6rem}
 }
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -98,19 +108,19 @@ blockquote.after{background:var(--hl);border-left:3px solid #C9A400}
 <header class="hero">
   <div>
     <img class="brand" src="logo-ecm.png" alt="ECM, École de Commerce et Management" onerror="this.hidden=true">
-    <h1>Fais relire ton CV par un recruteur avant de l’envoyer</h1>
-    <p class="lede">Dépose ton CV en PDF. En moins d’une minute, tu reçois des commentaires précis sur ton texte, des reformulations à adapter et trois actions à faire dans l’ordre. Gratuit, sans compte.</p>
+    <h1>Fais corriger ton CV comme une copie d’examen</h1>
+    <p class="lede">Dépose ton CV en PDF : tu récupères ta copie corrigée, avec les erreurs soulignées en rouge, les conseils en bleu et un commentaire numéroté pour chacun. Tout se passe dans ton navigateur : ton CV n’est ni envoyé, ni enregistré.</p>
   </div>
   <div class="sheet" aria-hidden="true">
     <div class="bar t" style="width:58%"></div>
     <div class="bar" style="width:36%"></div>
     <div class="bar h" style="width:30%"></div>
     <div class="bar" style="width:92%"></div>
-    <div class="bar hl" style="width:78%"></div>
+    <div class="bar ul" style="width:78%"></div>
     <div class="bar" style="width:64%"></div>
     <div class="bar h" style="width:34%"></div>
     <div class="bar" style="width:88%"></div>
-    <div class="bar hl" style="width:70%"></div>
+    <div class="bar ul" style="width:70%"></div>
     <div class="bar" style="width:52%"></div>
     <span class="note n1">chiffre ton résultat</span>
     <span class="note n2">et le lien LinkedIn ?</span>
@@ -124,212 +134,131 @@ blockquote.after{background:var(--hl);border-left:3px solid #C9A400}
       <label class="drop">
         <input type="file" id="file" accept="application/pdf,.pdf">
         <strong>Dépose ton CV ici ou clique pour le choisir</strong>
-        <span>PDF uniquement, 4 Mo maximum (dans Word : Fichier, Exporter, PDF). Il est lu dans ton navigateur : seul son texte est envoyé pour analyse.</span>
+        <span>PDF uniquement, 10 Mo maximum (dans Word : Fichier, Exporter, PDF).</span>
         <span id="fileName">Aucun fichier choisi</span>
       </label>
-
-
-      <label class="consent">
-        <input type="checkbox" id="consent">
-        <span>J’accepte que le texte de mon CV soit envoyé à une IA pour analyse. Il n’est ni enregistré ni conservé par ce site, et aucun compte n’est créé. Je n’y joins ni pièce d’identité ni donnée sensible.</span>
-      </label>
-
-      <button type="submit" id="go">Analyser mon CV</button>
+      <button type="submit" id="go">Corriger mon CV</button>
       <p id="error" class="error" role="alert" hidden></p>
       <p id="status" aria-live="polite"></p>
     </form>
+    <p class="privacy">Aucun compte, aucun cookie. La correction se fait sur ton ordinateur : ton CV ne quitte pas ton navigateur.</p>
   </section>
 
   <section id="output" hidden aria-labelledby="t-out">
-    <h2 id="t-out" class="sr" style="position:absolute;left:-9999px">Commentaires sur ton CV</h2>
-    <div class="copy" id="thread"></div>
-    <form id="followForm" class="followup">
-      <input type="text" id="question" aria-label="Ta question" placeholder="Pose une question ou demande de reformuler une partie" maxlength="1000">
-      <button type="submit" id="send">Envoyer</button>
-    </form>
-    <p id="followStatus" aria-live="polite" class="legal" style="margin:.75rem 0 0"></p>
-    <p class="again"><button type="button" class="ghost" id="again">Analyser un autre CV</button></p>
+    <div class="summary">
+      <h2 id="t-out" tabindex="-1"></h2>
+      <div class="actions">
+        <a class="btn" id="download" download="CV-corrige.pdf">Télécharger mon CV corrigé (PDF)</a>
+        <button type="button" class="ghost" id="again">Corriger un autre CV</button>
+      </div>
+    </div>
+    <div class="result">
+      <div class="preview">
+        <canvas id="preview" aria-label="Aperçu de ton CV corrigé"></canvas>
+        <p>Aperçu de la première page. Le PDF téléchargé contient aussi les pages de commentaires.</p>
+      </div>
+      <div class="copy" id="thread"></div>
+    </div>
   </section>
 
-  <p class="legal">Les commentaires sont générés par une IA à partir du texte de ton CV : la mise en page n’est pas analysée, vérifie-la toi-même (une page, lisible, alignée). Ils complètent l’avis de ton équipe placement, ils ne le remplacent pas. Relis chaque reformulation et remplace les éléments entre crochets par tes vrais résultats : ne mets jamais sur ton CV ce que tu ne peux pas défendre en entretien.</p>
+  <p class="legal">Cette relecture est automatique : elle vérifie la forme de ton CV (rubriques du modèle de l’école, dates, intitulé de formation officiel, orthographe courante, typographie), mais ne juge ni la qualité de tes formulations ni la mise en page. Elle complète l’avis de ton CREE, elle ne le remplace pas. Elle ne garantit aucun résultat de recherche d’alternance.</p>
 </main>
 </div>
 
+<noscript><p class="wrap">Ce site a besoin de JavaScript pour corriger ton CV dans ton navigateur.</p></noscript>
+<script src="vendor/pdf.min.js"></script>
+<script src="vendor/pdf-lib.min.js"></script>
+<script src="cv-engine.js"></script>
 <script>
-// À MODIFIER : l’adresse de ton Worker Cloudflare (voir README.md)
-const WORKER_URL = "https://cv-coach.TON-COMPTE.workers.dev";
-
-const MAX_PDF = 4 * 1024 * 1024;
-const MAX_FOLLOWUPS = 5;
-let messages = [];
-let followups = 0;
-
+const MAX_PDF = 10 * 1024 * 1024;
 const $ = id => document.getElementById(id);
-const form = $("cvForm"), fileInput = $("file"), go = $("go");
+let blobUrl = null;
 
-fileInput.addEventListener("change", () => {
-  $("fileName").textContent = fileInput.files[0] ? fileInput.files[0].name : "Aucun fichier choisi";
+pdfjsLib.GlobalWorkerOptions.workerSrc = "vendor/pdf.worker.min.js";
+
+$("file").addEventListener("change", () => {
+  const f = $("file").files[0];
+  $("fileName").textContent = f ? f.name : "Aucun fichier choisi";
 });
 
-function showError(msg){ const e = $("error"); e.textContent = msg; e.hidden = false; }
-function clearError(){ $("error").hidden = true; }
+const showError = m => { const e = $("error"); e.textContent = m; e.hidden = false; };
+const clearError = () => { $("error").hidden = true; };
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const plural = (n, w) => n + " " + w + (n > 1 ? "s" : "");
 
-const PDFJS_WORKER = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-async function extractPdfText(file){
-  const fail = () => new Error("Impossible de lire ce PDF. Exporte-le à nouveau depuis Word, Canva ou Google Docs (pas une photo ni un scan).");
-  if(!window.pdfjsLib) throw fail();
-  try{
-    const blob = new Blob(['importScripts("' + PDFJS_WORKER + '");'], { type: "text/javascript" });
-    pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);
-    const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
-    const pages = [];
-    for(let p = 1; p <= Math.min(pdf.numPages, 4); p++){
-      const content = await (await pdf.getPage(p)).getTextContent();
-      const lines = []; let line = "", lastY = null;
-      for(const it of content.items){
-        if(!("str" in it)) continue;
-        const y = it.transform[5];
-        if(lastY !== null && Math.abs(y - lastY) > 3){ lines.push(line.trim()); line = ""; }
-        line += it.str + " "; lastY = y;
-      }
-      lines.push(line.trim());
-      pages.push(lines.filter(Boolean).join("\n"));
+function renderNotes(res) {
+  let h = "";
+  if (res.findings.length) {
+    h += '<h3 class="sec">Commentaires du correcteur</h3><ul class="notes">';
+    for (const f of res.findings) {
+      h += '<li class="' + (f.kind === "error" ? "error-n" : "advice-n") + '"><span class="badge">' + f.n + '</span><div><h4>' + esc(f.title) +
+        '<span class="tag">' + (f.kind === "error" ? "À corriger" : "Conseil") + '</span></h4><p>' + esc(f.comment) + '</p>' +
+        (f.quote ? '<p class="q">Dans ton CV : « ' + esc(f.quote) + ' »</p>' : "") + '</div></li>';
     }
-    return pages.join("\n\n").replace(/[ \t]+/g, " ").trim();
-  } catch(e){ throw fail(); }
-}
-
-// Rendu Markdown minimal et sûr (le HTML est échappé avant tout)
-function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
-function inline(s){
-  return esc(s).replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>").replace(/\*(.+?)\*/g,"<em>$1</em>");
-}
-function render(md){
-  const out = []; let list = null;
-  const close = () => { if(list){ out.push("</" + list + ">"); list = null; } };
-  for(const raw of md.split("\n")){
-    const line = raw.trimEnd(); let m;
-    if(!line.trim()){ close(); continue; }
-    if((m = line.match(/^#{1,4}\s+(.*)/))){ close(); out.push("<h3>" + inline(m[1]) + "</h3>"); continue; }
-    if((m = line.match(/^>\s?(.*)/))){
-      close();
-      const cls = /^\W*avant/i.test(m[1]) ? "before" : /^\W*apr[eè]s/i.test(m[1]) ? "after" : "";
-      out.push('<blockquote class="' + cls + '">' + inline(m[1]) + "</blockquote>"); continue;
-    }
-    if((m = line.match(/^\s*[-*]\s+(.*)/))){ if(list !== "ul"){ close(); out.push("<ul>"); list = "ul"; } out.push("<li>" + inline(m[1]) + "</li>"); continue; }
-    if((m = line.match(/^\s*\d+[.)]\s+(.*)/))){ if(list !== "ol"){ close(); out.push("<ol>"); list = "ol"; } out.push("<li>" + inline(m[1]) + "</li>"); continue; }
-    close(); out.push("<p>" + inline(line) + "</p>");
+    h += "</ul>";
+  } else {
+    h += '<h3 class="sec">Commentaires du correcteur</h3><p>Aucun point à corriger n’a été détecté. Fais tout de même relire ton CV par ton CREE.</p>';
   }
-  close();
-  return out.join("");
+  if (res.positives.length) h += '<h3 class="sec">Ce qui est conforme au modèle</h3><ul class="ok-list">' + res.positives.map(p => "<li>" + esc(p) + "</li>").join("") + "</ul>";
+  $("thread").innerHTML = h;
 }
 
-async function callWorker(){
-  if(WORKER_URL.includes("TON-COMPTE")) throw new Error("config");
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 120000);
-  try{
-    const res = await fetch(WORKER_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages }),
-      signal: ctrl.signal
-    });
-    const data = await res.json().catch(() => ({}));
-    if(!res.ok) throw new Error(data.error || "Erreur " + res.status);
-    return data.text;
-  } finally { clearTimeout(timer); }
+async function renderPreview(bytes) {
+  const pdf = await pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
+  const page = await pdf.getPage(1);
+  const base = page.getViewport({ scale: 1 });
+  const cssW = Math.min(520, $("preview").parentElement.clientWidth - 24 || 520);
+  const scale = (cssW / base.width) * Math.min(window.devicePixelRatio || 1, 2);
+  const vp = page.getViewport({ scale });
+  const c = $("preview"); c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
+  await page.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise;
 }
 
-function friendly(err){
-  if(err.message === "config") return "Le site n’est pas encore configuré : renseigne WORKER_URL dans index.html.";
-  if(err.name === "AbortError") return "L’analyse a pris trop de temps. Réessaie dans un instant.";
-  if(err.message === "Failed to fetch") return "Connexion impossible. Vérifie ta connexion et réessaie.";
-  return err.message;
-}
-
-function reveal(){
-  const out = $("output"); out.hidden = false;
-  const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  out.scrollIntoView({ behavior: calm ? "auto" : "smooth", block: "start" });
-}
-
-form.addEventListener("submit", async e => {
+$("cvForm").addEventListener("submit", async e => {
   e.preventDefault(); clearError();
-  const file = fileInput.files[0];
+  const file = $("file").files[0];
+  if (!file) return showError("Ajoute ton CV au format PDF.");
+  if (file.type !== "application/pdf" && !/\.pdf$/i.test(file.name)) return showError("Le fichier doit être un PDF. Dans Word : Fichier, Exporter, PDF.");
+  if (file.size > MAX_PDF) return showError("Ce PDF dépasse 10 Mo. Exporte-le à nouveau sans images lourdes.");
 
-  if(!file) return showError("Ajoute ton CV au format PDF.");
-  if(file.type !== "application/pdf" && !/\.pdf$/i.test(file.name)) return showError("Le fichier doit être un PDF. Dans Word : Fichier, Exporter, PDF.");
-  if(file.size > MAX_PDF) return showError("Ce PDF dépasse 4 Mo. Exporte-le à nouveau sans images lourdes.");
-  if(!$("consent").checked) return showError("Coche la case d’accord pour lancer l’analyse.");
+  $("go").disabled = true;
+  $("status").textContent = "Correction en cours…";
+  try {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let doc;
+    try { doc = await CVEngine.extract(pdfjsLib, bytes); }
+    catch (err) { throw new Error("Impossible de lire ce PDF. Exporte-le à nouveau depuis Word, Canva ou Google Docs."); }
+    if (doc.lines.reduce((n, l) => n + l.text.length, 0) < 150) throw new Error("Ce PDF ne contient pas de texte lisible (scan ou photo). Exporte-le à nouveau depuis Word, Canva ou Google Docs.");
+    const res = CVEngine.analyze(doc);
+    let logoBytes = null;
+    try { const r = await fetch("logo-ecm.png"); if (r.ok) logoBytes = new Uint8Array(await r.arrayBuffer()); } catch (err) { /* logo facultatif */ }
+    let out;
+    try { out = await CVEngine.annotate(PDFLib, bytes, doc, res, { logoBytes }); }
+    catch (err) { throw new Error("Ce PDF ne peut pas être annoté (fichier protégé ou abîmé). Exporte-le à nouveau depuis Word, Canva ou Google Docs."); }
 
-  const ctx = [
-    "Contexte de l’étudiant :",
-    "- Recherche : alternance",
-    "- Ouverture : l’étudiant reste ouvert à plusieurs types de postes et de secteurs"
-  ].join("\n");
-
-  go.disabled = true;
-  $("status").textContent = "Lecture de ton CV en cours, compte une trentaine de secondes…";
-
-  try{
-    let cvText = await extractPdfText(file);
-    if(cvText.length < 200) throw new Error("Ce PDF ne contient pas de texte lisible (scan ou photo). Exporte-le à nouveau depuis Word, Canva ou Google Docs.");
-    cvText = cvText.slice(0, 20000);
-    messages = [{ role: "user", content: ctx + "\n\nTexte extrait du CV :\n\n" + cvText }];
-    followups = 0;
-    const text = await callWorker();
-    messages.push({ role: "assistant", content: text });
-    $("thread").innerHTML = render(text);
-    $("followStatus").textContent = "";
-    reveal();
-  } catch(err){
-    messages = [];
-    showError(friendly(err));
+    if (blobUrl) URL.revokeObjectURL(blobUrl);
+    blobUrl = URL.createObjectURL(new Blob([out], { type: "application/pdf" }));
+    const a = $("download"); a.href = blobUrl; a.download = file.name.replace(/\.pdf$/i, "") + "-corrige.pdf";
+    $("t-out").innerHTML = 'Ta copie est corrigée : <span class="e">' + plural(res.errors, "correction") + '</span> et <span class="a">' + plural(res.advice, "conseil") + "</span>";
+    renderNotes(res);
+    $("output").hidden = false;
+    try { await renderPreview(out); } catch (err) { $("preview").parentElement.hidden = true; }
+    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    $("output").scrollIntoView({ behavior: calm ? "auto" : "smooth", block: "start" });
+    $("t-out").focus({ preventScroll: true });
+  } catch (err) {
+    showError(err.message);
   } finally {
-    go.disabled = false; $("status").textContent = "";
+    $("go").disabled = false; $("status").textContent = "";
   }
-});
-
-$("followForm").addEventListener("submit", async e => {
-  e.preventDefault();
-  const q = $("question").value.trim();
-  if(!q) return;
-  if(followups >= MAX_FOLLOWUPS){
-    $("followStatus").textContent = "Limite de questions atteinte pour ce CV. Relance une analyse avec ta nouvelle version.";
-    return;
-  }
-  $("send").disabled = true;
-  $("followStatus").textContent = "Réponse en cours…";
-  messages.push({ role: "user", content: q });
-  try{
-    const text = await callWorker();
-    messages.push({ role: "assistant", content: text });
-    followups++;
-    $("thread").insertAdjacentHTML("beforeend", '<p class="ask">' + esc(q) + "</p>" + render(text));
-    $("question").value = "";
-    $("followStatus").textContent = followups >= MAX_FOLLOWUPS ? "Dernière question utilisée pour ce CV." : "";
-  } catch(err){
-    messages.pop();
-    $("followStatus").textContent = friendly(err);
-  } finally { $("send").disabled = false; }
 });
 
 $("again").addEventListener("click", () => {
-  messages = []; followups = 0;
   $("output").hidden = true; $("thread").innerHTML = "";
-  form.reset(); $("fileName").textContent = "Aucun fichier choisi";
+  $("preview").parentElement.hidden = false;
+  $("cvForm").reset(); $("fileName").textContent = "Aucun fichier choisi";
   window.scrollTo({ top: 0 });
 });
-
-// Compteur de visites anonyme : une par onglet, sans cookie ni adresse IP
-(function(){
-  try{
-    if(sessionStorage.getItem("hit") || WORKER_URL.includes("TON-COMPTE")) return;
-    sessionStorage.setItem("hit", "1");
-    fetch(WORKER_URL.replace(/\/$/, "") + "/hit", { method: "POST", keepalive: true }).catch(() => {});
-  } catch(e){}
-})();
 </script>
 </body>
 </html>
